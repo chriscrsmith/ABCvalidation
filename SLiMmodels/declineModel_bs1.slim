@@ -1,0 +1,85 @@
+
+
+
+
+
+// set up a simple neutral simulation  
+initialize()
+{
+	// set the overall mutation rate  
+	initializeMutationRate(1e-9);
+
+	// m1 neutral, m2 deleterious
+	initializeMutationType("m1", 0.5, "f", 0.0);
+	initializeMutationType("m2", 0.5, "e", -0.1);
+
+	// g1 genomic element types
+	initializeGenomicElementType("g1", m1, 1.0);
+	initializeGenomicElementType("g2", m2, 1.0);
+
+
+	// what I want, here, is a stretch under selection (20%), then a neutral stretch (80%)
+	for (index in 1:numLoci)
+	{
+	    initializeGenomicElement(g2, index*locLength*10, index*locLength*10 + asInteger(locLength*0.2)-1);
+	    initializeGenomicElement(g1, index*locLength*10 + asInteger(locLength*0.2), index*locLength*10 + asInteger(locLength)-1);
+	}
+
+	// uniform recombination along the chromosome  
+        initializeRecombinationRate(1e-8);
+}
+
+
+
+// create a population, and reschedule event times according to command line parameters
+1 { 
+sim.addSubpop("p1", p1size0); 
+sim.rescheduleScriptBlock(s1, (p1size0*10), (p1size0*10));
+sim.rescheduleScriptBlock(s2, (p1size0*10)+sizeChangeTime-splitTime, (p1size0*10)+sizeChangeTime-splitTime);
+sim.rescheduleScriptBlock(s3, (p1size0*10)+sizeChangeTime, (p1size0*10)+sizeChangeTime);
+sim.rescheduleScriptBlock(s4, (p1size0*10)+sizeChangeTime, (p1size0*10)+sizeChangeTime);
+}
+
+// change pop size
+s1 10
+{ 
+p1.setSubpopulationSize(p1size1); 
+} 
+
+s2 10 { sim.addSubpopSplit("p2", p2size0, p1); }
+
+// run to generation 10000  
+s3 10 { sim.simulationFinished(); }
+
+
+s4 10 late() // custom output
+{
+	//obtain random samples of genomes from the two subpopulations
+   	g_1 = sample(p1.genomes, numSamples);
+	g_2 = sample(p2.genomes, numSamples);
+	//Concatenate the two samples
+	g_12=c(g_1,g_2);
+
+
+	// get the unique mutations in the sample, sorted by position
+	m = sortBy(unique(g_12.mutations), "position");
+
+	// print the number of segregating sites 
+	cat("\n\nsegsites: " + size(m) + "\n");
+		
+	// print the positions 
+	positions = format("%.10f", m.position / sim.chromosome.lastPosition);
+	cat("positions: " + paste(positions, " ") + "\n");
+
+	// print the sampled genomes
+	for (genome in g_12)
+	{
+		hasMuts = (match(m, genome.mutations) >= 0);
+		cat(paste(asInteger(hasMuts), "") + "\n");
+	}
+
+}
+
+
+
+
