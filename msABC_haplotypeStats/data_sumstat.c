@@ -344,33 +344,28 @@ int calc_wIbs(double* wAi,
   double af1,
     af2,
     currentTractLength,
-    longestRun,
+    longestRun= 0.,
     numComparisons = 0.,
     totalSegments = 0,
     numIbsSegments;
 
-  char *currentSeq1 = (char*)malloc(segsites*(sizeof(char)+1));
-  char *currentSeq2 = (char*)malloc(segsites*(sizeof(char)+1));
-
+  //char *currentSeq1, *currentSeq2;
+  char *currentSeq1 = (char*)malloc((segsites+1)*(sizeof(char)));
+  char *currentSeq2 = (char*)malloc((segsites+1)*(sizeof(char)));
 
   
-  //  printf("\n");
-  
-  // find shared IBS tracts. NOTE: this approach- comparing every haplotype- is ideal only for long sequences      
+  // find shared IBS tracts. NOTE: this approach- comparing every haplotype- is not ideal for short sequences
   if (segsites > 0){ // compare each pair of haplotypes
     for(h1=start; h1<(end-1); h1++){ // for each haplotype (in pop1)
+      strncpy(currentSeq1, list[h1], segsites+1);
       for(h2=(h1+1); h2<end; h2++){ // compare with each haplotype (in pop2)
-	//printf("h1 h2: %i %i %s %s\n", h1, h2, list[h1], list[h2]);
-	strncpy(currentSeq1, list[h1], segsites);
-	strncpy(currentSeq2, list[h2], segsites);
+	strncpy(currentSeq2, list[h2], segsites+1);
 	numComparisons = numComparisons + 1;
+	numIbsSegments = 1; // minimum number of segments = 1
 	if (strcmp(currentSeq1, currentSeq2) == 0){ // same haplotype
 	  longestRun = 1; // proportion 1 
-	  numIbsSegments = 1; 
 	}
 	else{ // analyze differences between haplotypes
-	  longestRun = 0;
-	  numIbsSegments = 1; // this "1" is counting the first segment (num segments = num differences + 1)
 	  currentTractLength = 0;
 	  startPos = -1; // initialize with "-1", meaning no shared position to begin the "run" with
 	  for(k=0; k<segsites; k++){
@@ -380,8 +375,8 @@ int calc_wIbs(double* wAi,
 	      }
 	    }
 	    else{ // reached a position that differs
-	      numIbsSegments = numIbsSegments + 1;
-	      if (startPos == -1){ // if the previous site was also different, then find distance since last seg site, or beginning of locus
+	      numIbsSegments++;
+	      if (startPos == -1){ // if the previous site was also different, or this is first seg site, then find segment length
 		if(k == 0){
 		  currentTractLength = segPositions[0]; // this is the first seg site, so just take distance from beginning of locus
 		}
@@ -390,7 +385,7 @@ int calc_wIbs(double* wAi,
 		}
 	      }
 	      else if(startPos == 0){ // if current start is the first seg site, then the whole locus before the first seg site is also shared
-		currentTractLength = segPositions[k]; // k, not k-1, because all the way up until the current position (not the previous) is shared
+		currentTractLength = segPositions[k]; // from the start of the sequence all the way up until the current position is shared
 	      }
 	      else{ // current start of run is somewhere in the middle of the locus
 		currentTractLength = segPositions[k] - segPositions[startPos-1]; // "-1" because all the way back to the pre-start seg site is shared
@@ -398,7 +393,7 @@ int calc_wIbs(double* wAi,
 	      if( currentTractLength > longestRun ){ // is the current run the longest run encountered so far?
 		longestRun = currentTractLength; 
 	      }
-	      startPos = -1; // restart the run
+	      startPos = -1; // start new run
 	    }
 	  }
 	  if(startPos != -1){ // the next several lines evaluate the end-chunk of the locus, after looping through the seg sites.
@@ -414,9 +409,7 @@ int calc_wIbs(double* wAi,
 	totalSegments += numIbsSegments;
       }
     }
-    //    printf("totBeforeB: %f %f\n", totalSegments, numComparisons);
-    totalSegments = (double)1 / ( totalSegments / (double)numComparisons ); // 1 over the average* number of segments
-    //    printf("totAfter: %f\n", totalSegments);
+    totalSegments = (double)1 / ( totalSegments / (double)numComparisons ); // 1 over the average number of segments
   }
   else{ // if 0 seg sites
     longestRun = 1;
@@ -429,8 +422,6 @@ int calc_wIbs(double* wAi,
   }
   *wAi = totalSegments;
   *wLi = longestRun;
-  //  printf("totEnd: %f\n", *wAi);
-  //printf("results: %f %f\n", *wAi, *wLi);
   free(currentSeq1);
   free(currentSeq2);
   return 1;
@@ -574,9 +565,11 @@ int calculations(double* weights, // larger pops have greater weight
   //printf("\ncheck this out:  n = %i, segs = %i, list[0] = %s \n", n, segsites, list[0]);
   //printf("segPositions[0], segsites: %f %i\n", segPositions[0], segsites);
   //printf("\n\nlocus length %i\n\n", locusLength);
-
+  //printf("\n");
+  
   int i, 
-    j, 
+    j,
+    c,
     k=0, 
     start=0, 
     end=0,
@@ -612,8 +605,6 @@ int calculations(double* weights, // larger pops have greater weight
     currentTractLength,
     longestRun;
 
-  char *currentSeq = (char*)malloc(segsites*(sizeof(char)+1));
-  
   int* almap_i = (int*)malloc(segsites*sizeof(int));
   int* almap_j = (int*)malloc(segsites*sizeof(int));
   int* missing_i = (int*)malloc(segsites*sizeof(int));
@@ -625,7 +616,7 @@ int calculations(double* weights, // larger pops have greater weight
     printf("\ncannot allocate memory!\n");
     exit(-1);
   }
-  
+
   static int* samples_b = NULL;
   static int* samples_e = NULL;
   static int first=1;
@@ -659,44 +650,38 @@ int calculations(double* weights, // larger pops have greater weight
 
   // find distinct haplotypes
   for(i=0; i < n; i++){ // allocating memory to haplotype matrix
-    haplos[i] = (char*)malloc(segsites*(sizeof(char)+1)); 
+    haplos[i] = (char*)malloc(segsites*(sizeof(char)+1));
   }
-  for(i=0; i<npop; i++){ // looping through pops to initialize haplotypeCounts matrix with zeros
+  for(i=0; i<npop; i++){ // initializing haplotypeCounts matrix with zeros for each pop
     for(j=0; j<n; j++){
       haploCounts[i][j] = 0;
     }
   }
-  if (segsites > 0){  
+  if (segsites > 0){
     for (ind=0; ind<n; ind++){ // will want to upgrade this to a hash table one day
-      newHaplotype = 1; // default setting
-      //printf("\n list %i: %s \n", ind, list[ind]);
-      if (numHaps == 0){ // first haplotype, add to list
-	strncpy(haplos[0], list[ind], segsites); // do not copy whole string, because the list[] variable is never freed and contains sequences from previous sims
-	haplos[0][segsites] = '\0'; // null terminator
+      newHaplotype = 1; // default setting. 1 means the haplotype is new to our list
+      if (numHaps == 0){ // first haplotype. Including this block, because below there's a line comparing to empty (in this case) haplotype array
+	strncpy(haplos[0], list[ind], segsites+1);
 	numHaps = 1;
-	haploCounts[0][0]++; // count this haplotype for the current sample (which is population 0 here, and haplotype 0)
+	haploCounts[0][0]++; // count this haplotype for the current sample (which is population 0 here, and haplotype 0)                           
       }
-      else {
+      else{
 	for (i=0; i<npop; i++){ // determine which population this sample belongs to
 	  start = samples_b[i];
 	  end = samples_e[i];
-	  //printf("\n start ends: %i %i \n", start, end);
 	  if (ind >= start && ind < end){
 	    popIndex = i;
 	  }
 	}
 	for (g=0; g<numHaps; g++){ // compare with haplotypes already in list
-          strncpy(currentSeq, list[ind], segsites);
-          if (strcmp(currentSeq,haplos[g]) == 0){
-	    newHaplotype = 0;
+	  if (strcmp(list[ind], haplos[g]) == 0){
+	    newHaplotype = 0; // 0 means the haplotype is already in the list
 	    haploCounts[popIndex][g]++;
 	  }
 	}
 	if (newHaplotype == 1){
-	  strncpy(haplos[numHaps], list[ind], segsites);
-	  haplos[numHaps][segsites] = '\0';
+	  strncpy(haplos[numHaps], list[ind], segsites+1);
 	  haploCounts[popIndex][numHaps]++;
-	  //printf("\n numHaps, newhap: %i %s \n", numHaps, haplos[numHaps]); 
 	  numHaps += 1;
 	}
       }
@@ -815,17 +800,19 @@ int calculations(double* weights, // larger pops have greater weight
       // shl (average shared haplotype tract length) and lsh (longest shared haplotype tract length)
       longestRun = 0;
       if (segsites > 0){ // compare each haplotype from pop1 with each haplotype from pop2
-	for(h1=0; h1<numHaps; h1++){ // for each haplotype (in pop1)
+	for(h1=0; h1<numHaps; h1++){ // for each haplotype
+	  //printf("%i %i %s\n", haploCounts[i][h1], haploCounts[j][h1], haplos[h1]); 
 	  if (haploCounts[i][h1] > 0){ // if it's present in pop1
-	    for(h2=0; h2<numHaps; h2++){ // compare with each haplotype (in pop2)
-	      if (haploCounts[j][h2] > 0){ // if this hap is in pop2, then compare
+	    for(h2=0; h2<numHaps; h2++){ // compare with each other haplotype
+	      if (haploCounts[j][h2] > 0){ // if the current hap is in pop2, then compare
+		//printf("%i %i %s %s\n", haploCounts[i][h1], haploCounts[j][h2], haplos[h1], haplos[h2]);
+		numIbsSegments = 1; // minimum number of segments = 1
 		if (h1 == h2){ // same haplotype.
 		  longestRun = 1;
-		  numIbsSegments = 1;
 		}
 		else{ // analyze differences between haplotypes
+		  //printf("%s %s %i\n", haplos[h1], haplos[h2], segsites);
 		  startPos = -1; // initialize with "-1", meaning no shared position to begin the "run" with
-		  numIbsSegments = 0;
 		  currentTractLength = 0;
 		  for(k=0; k<segsites; k++){
 		    if(haplos[h1][k] == haplos[h2][k]){ // current position is shared
@@ -834,6 +821,7 @@ int calculations(double* weights, // larger pops have greater weight
 		      }
 		    }
 		    else{ // reached a position that differs
+		      numIbsSegments++;
 		      if (startPos == -1){ // if the previous site was also different, then simply evaluate the distance since the last seg site
 			if(k == 0){
 			  currentTractLength = segPositions[0];
@@ -852,7 +840,6 @@ int calculations(double* weights, // larger pops have greater weight
 			longestRun = currentTractLength;
 		      }
 		      startPos = -1; // restart the run
-		      numIbsSegments++;
 		    }
 		  }
 		  if(startPos != -1){ // the next several lines evaluate the end-chunk of the locus, after looping through the seg sites.
@@ -864,7 +851,6 @@ int calculations(double* weights, // larger pops have greater weight
 		  if( currentTractLength > longestRun ){
 		    longestRun = currentTractLength;
 		  }
-		  numIbsSegments++;
 		}
 		af1 = (float)haploCounts[i][h1] / (float)config[i]; // many curly braces in this section; make sure this block is correctly inserted 
 		af2 = (float)haploCounts[j][h2] / (float)config[j];
@@ -916,12 +902,10 @@ int calculations(double* weights, // larger pops have greater weight
   free(almap_j);
   free(missing_i);
   free(missing_j);
-  free(currentSeq);
   for (i=0; i<n; i++){
     free(haplos[i]);
   }
   free(haplos);
-
   return 1;
 }
 	

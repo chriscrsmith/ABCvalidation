@@ -1709,7 +1709,6 @@ int main(int argc, char** argv){
               case 5: // wshl
                 if(sstats.pristats == 1 && pars.cp.npop > 1 && sstats.priwshl){
                   for(ipop=0; ipop<pars.cp.npop; ipop++){
-		    //printf("\n\npost %i\n\n",  sizeof(posit)/sizeof(posit[0]));
 		    calc_wIbs(&priwshl[ipop], &priwlibs[ipop], list, (pars.cp.config)[ipop], segsites, 
 			      filter, npop_allelic_map[ipop], npop_ders[ipop], npop_missing_map[ipop], samples_b[ipop], samples_e[ipop], posit, flength[i]);
 		    priave_wshl[ipop] += sstats_weights[ii] * priwshl[ipop];
@@ -5153,7 +5152,7 @@ int main(int argc, char** argv){
 int gensam( char **list, double *pprobss, double *ptmrca, double *pttot, int largestnsam, int old_maxnsam) 
 {
 
-  //fprintf(stderr, "pars.mp.theta: %e\n", pars.mp.theta);
+  //fprintfOB(stderr, "pars.mp.theta: %e\n", pars.mp.theta);
   int nsegs, h, i, k, j, seg, ns, start, end, len, segsit ;
   struct segl *seglst, *segtre_mig(struct c_params *p, int *nsegs) ; /* used to be: [MAXSEG];  */
   double nsinv,  tseg, tt, ttime(struct node *, int nsam), ttimemf(struct node *, int nsam, int mfreq) ;
@@ -6426,12 +6425,14 @@ double Fst(char fst[10], double p1, double p2, double p3, double p4){
 
 
 int getobservations(FILE* obin, char*** data){
-  int i=0, j=0;
+  int i=0, j=0, p=0;
+  double position;
   int limx = 10000, limy = 1000;
   char line[1000000]; 
   int segsites;
   int first = 0;
-
+  char * pch;
+  
   /* read the next dataset */
   while( fscanf(obin, "%s", line) != EOF){
     //printf("%s\n", line);
@@ -6454,6 +6455,25 @@ int getobservations(FILE* obin, char*** data){
 	fprintf(stderr, "cannot read the next line (after segsites)\n");
 	exit(1);
       }
+      ///// (added by chris)
+      else{
+	if (segsites > 0)
+	{
+	  pch = strtok(line, " ");
+	  while (pch != NULL)
+	  {
+	    pch = strtok (NULL, " ");
+	    if (p < segsites)
+	    {
+	      //printf("\%s\n", pch);
+	      sscanf(pch, "%lf", &position);
+	      posit[p] = position;
+	      p++;
+	    }
+	  }
+	}
+      }
+      /////
       
       continue;
       
@@ -6464,8 +6484,7 @@ int getobservations(FILE* obin, char*** data){
       //fprintf(stderr, "%d\n", segsites);
       return segsites;
     }
-    
-    
+
     if( first && (line[0] == '1' || line[0] == '0' || line[0] == MISSING)){
       assert(j < 1000000 && i < pars.cp.nsam);
       j=0;
