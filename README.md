@@ -11,12 +11,11 @@ SLiMmodels/ contains the edos code for the slim models used in our publication.
 
 The "comparePhased" R scripts are what we used to analyze msABC output.
 
-
-Pavlidis, P., Laurent, S., & Stephan, W. (2010). msABC: a modification of
+References:
+- Pavlidis, P., Laurent, S., & Stephan, W. (2010). msABC: a modification of
 Hudson’s ms to facilitate multi‐locus ABC analysis. Molecular Ecology
 Resources, 10(4), 723-727.
-
-Smith, C. C., & Flaxman, S. M. (2019). Leveraging whole genome sequencing data for demographic inference with approximate Bayesian computation. Molecular ecology resources.
+- Smith, C. C., & Flaxman, S. M. (2019). Leveraging whole genome sequencing data for demographic inference with approximate Bayesian computation. Molecular ecology resources.
 
 
 
